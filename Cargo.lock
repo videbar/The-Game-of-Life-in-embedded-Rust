@@ -183,9 +183,9 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "microbit-common"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e73801aec4899e757c211ae31886ef1a518c05d34ab6ddf2b2c0b4ec449465a"
+checksum = "45651d001be4281a6f4536c30f3d8522f231bc56fd58d5baf2c630f565d31256"
 dependencies = [
  "embedded-hal",
  "nrf52833-hal",
@@ -194,9 +194,9 @@ dependencies = [
 
 [[package]]
 name = "microbit-v2"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cddfc92e0a8b1ab364e77eecbb2a667ea292b9af875c492af472ad895f84c5a"
+checksum = "a9895242259950730bc112623e4a2e37345dc51ddb5fc8878c110489260d84e7"
 dependencies = [
  "microbit-common",
 ]

@@ -11,4 +11,4 @@ cortex-m-rt = "0.7.0"
 # panic-halt = "0.2.0"
 rtt-target = { version = "0.3.1", features = ["cortex-m"] }
 panic-rtt-target = { version = "0.1.2", features = ["cortex-m"] }
-microbit-v2 = "0.12.0"
+microbit-v2 = "0.13.0"
