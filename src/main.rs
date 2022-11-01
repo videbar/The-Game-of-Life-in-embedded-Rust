@@ -1,6 +1,8 @@
-// #![deny(unsafe_code)]
 #![no_main]
 #![no_std]
+
+mod game_of_life;
+use game_of_life::LifeState;
 
 use core::cell::RefCell;
 use cortex_m::interrupt::Mutex;
@@ -16,8 +18,6 @@ use microbit::{
 };
 use panic_rtt_target as _;
 use rtt_target::rtt_init_print;
-
-mod game_of_life;
 
 // This Mutex is a wrapper that protects the data inside from being accessed by multiple
 // threads at the same time. If one thread wants to access the data inside the Mutex, it
@@ -35,6 +35,9 @@ static GPIO: Mutex<RefCell<Option<Gpiote>>> = Mutex::new(RefCell::new(None));
 
 // Flag that indicates if the game is paused.
 static PAUSED: Mutex<RefCell<bool>> = Mutex::new(RefCell::new(false));
+
+// Mutex that contains the game of life state.
+static GAME_STATE: Mutex<RefCell<Option<LifeState>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -100,19 +103,29 @@ fn main() -> ! {
         [false, false, false, false, false],
     ];
 
-    let mut state = game_of_life::LifeState {
-        matrix: initial_state_matrix,
-    };
+    // Build a LifeState from the matrix and place it into the Mutex.
+    cortex_m::interrupt::free(move |cs| {
+        *GAME_STATE.borrow(cs).borrow_mut() = Some(LifeState {
+            matrix: initial_state_matrix,
+        });
+    });
 
     loop {
-        display.show(&mut timer, state.int_matrix(), 1500);
-        // Start a critical section to be able to access the PAUSED variable.
+        // Start a critical section to be able to access the global variables.
         cortex_m::interrupt::free(|cs| {
-            let is_paused = *PAUSED.borrow(cs).borrow();
-            // Update the state only if it is not paused.
-            if !is_paused {
-                state.next_state();
-            };
+            if let Some(state) = GAME_STATE.borrow(cs).borrow_mut().as_mut() {
+                display.show(&mut timer, state.int_matrix(), 1500);
+
+                // Update the state only if it is not paused. The first call to the
+                // .borrow() method is to the Mutex .borrows (this is why it requires
+                // the critical section token), which returns a reference to the
+                // RefCell. The second call to .borrow() is to the RefCell .borrow()
+                // method is to the RefCell .borrow() method, which returns a reference
+                // to the boolean inside. This reference is dereferenced using *.
+                if !*PAUSED.borrow(cs).borrow() {
+                    state.next_state();
+                };
+            }
         });
     }
 }
@@ -134,14 +147,19 @@ fn GPIOTE() {
                 // RefCell (which by now is the default value, since the old one was
                 // taken by the .take() method) with the negated (!) from the old value.
                 PAUSED.borrow(cs).replace(!PAUSED.borrow(cs).take());
-
-                // Reset the event.
-                gpiote.channel0().reset_events();
             };
-            if button_b_pressed {
-                // TODO: Move to the next state.
-                gpiote.channel1().reset_events();
+            // Update the state when the button b is pressed and the game is paused.
+            if button_b_pressed && *PAUSED.borrow(cs).borrow() {
+                GAME_STATE
+                    .borrow(cs)
+                    .borrow_mut()
+                    .as_mut()
+                    .unwrap()
+                    .next_state();
             };
+            // Reset the events.
+            gpiote.channel0().reset_events();
+            gpiote.channel1().reset_events();
         }
     });
 }
