@@ -19,24 +19,34 @@ use microbit::{
 use panic_rtt_target as _;
 use rtt_target::rtt_init_print;
 
-// This Mutex is a wrapper that protects the data inside from being accessed by multiple
-// threads at the same time. If one thread wants to access the data inside the Mutex, it
-// locks it, preventing other threads from accessing the data until it is done and it
-// unlocks it.
+// These Mutex are a wrapper that protects the data inside from being accessed by
+// multiple threads at the same time. If one thread wants to access the data inside the
+// Mutex, it locks it, preventing other threads from accessing the data until it is done
+// and it unlocks it.
 // The cortex_m::interrupt Mutex is a special implementation of the Mutex that is safe
 // to use when some of the threads that will try to access the data are interrupt
-// handler .The way this is done is by implementing the lock of the Mutex in a critical
+// handlers. The way this is done is by implementing the lock of the Mutex in a critical
 // section so it can't be interrupted. Otherwise, a deadlock could occur. This is what
 // happens when a thread locks the Mutex, and it is interrupted before it can unlock by
 // an interrupt that wants to access the Mutex too. The main thread is then halted until
 // the interrupt handler is executed, but the interrupt handler is waiting for the main
 // thread to unlock the Mutex, causing a permanent locked state.
+// The RefCell inside the Mutex are also a data wrapper, in this case they provide
+// interior mutability. This means that the data inside the RefCell can be mutated,
+// even though the RefCell itself is not mutable.
+// By combining a Mutex and a RefCell, it's possible to define global mutable variables,
+// i.e., variables that can be accessed from various threads (thanks to the Mutex) and
+// can be modified (thanks to the RefCell and interior mutability).
+// If the initial value of the global mutable value is not known yet, an additional
+// Option can be placed inside the RefCell. The None variant acts then as a placeholder
+// until a value is placed in the RefCell.
+
+// Struct used to handle the GPIO pins.
 static GPIO: Mutex<RefCell<Option<Gpiote>>> = Mutex::new(RefCell::new(None));
 
-// Flag that indicates if the game is paused.
+// Flag to keep track of whether or not the game is paused.
 static PAUSED: Mutex<RefCell<bool>> = Mutex::new(RefCell::new(false));
 
-// Mutex that contains the game of life state.
 static GAME_STATE: Mutex<RefCell<Option<LifeState>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
@@ -70,7 +80,7 @@ fn main() -> ! {
     // are configured inside a critical section to avoid the configuration being
     // interrupted.
     cortex_m::interrupt::free(move |cs| {
-        // Processor have a mask that indicate which interrupts are enable and which
+        // Processors have a mask that indicate which interrupts are enable and which
         // are not. Masking an interrupt means disabling it, as it is added to the mask,
         // unmasking means enabling it.
         // Unmasking an interrupt is unsafe because it may break critical operations
@@ -78,9 +88,6 @@ fn main() -> ! {
         unsafe {
             pac::NVIC::unmask(pac::Interrupt::GPIOTE);
         }
-        // A pending interupt is an interrupt which has been raised but has not been
-        // handled yet by the CPU. The unpend function resets the interrupt pending
-        // state.
         pac::NVIC::unpend(pac::Interrupt::GPIOTE);
 
         // Place the gpiote variable inside GPIO, which is the Mutex that acts as a
